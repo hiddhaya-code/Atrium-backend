@@ -3,6 +3,15 @@ set -e
 
 echo "=== Atrium Starting ==="
 
+# Strip any accidental surrounding quotes from environment variables
+for var in DATABASE_URL DIRECT_URL BETTER_AUTH_SECRET WEB_URL API_URL; do
+  eval val=\$$var
+  if [ -n "$val" ]; then
+    cleaned=$(printf '%s' "$val" | sed -e 's/^["'"'"']//' -e 's/["'"'"']$//')
+    export $var="$cleaned"
+  fi
+done
+
 # Caddy rewrites the Origin of every /api request to WEB_URL, and the API only
 # trusts that origin. Left unset, the first sign-in works (no cookie, so the
 # origin is never checked) and every later one fails with "Invalid origin".

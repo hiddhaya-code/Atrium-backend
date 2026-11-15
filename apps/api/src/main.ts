@@ -30,6 +30,16 @@ function loadEnv(filePath: string) {
 loadEnv(resolve(process.cwd(), "../../.env"));
 loadEnv(resolve(process.cwd(), ".env"));
 
+// Strip any surrounding quotes from critical environment variables
+for (const key of ["DATABASE_URL", "DIRECT_URL", "BETTER_AUTH_SECRET", "WEB_URL", "API_URL"]) {
+  if (process.env[key]) {
+    let v = process.env[key]!.trim();
+    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+      process.env[key] = v.slice(1, -1).trim();
+    }
+  }
+}
+
 // Initialize Sentry after env vars are loaded and before NestJS bootstrap
 initSentry();
 
