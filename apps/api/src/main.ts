@@ -40,6 +40,12 @@ for (const key of ["DATABASE_URL", "DIRECT_URL", "BETTER_AUTH_SECRET", "WEB_URL"
   }
 }
 
+// Auto-align WEB_URL with Render external URL if running on Render
+if (process.env.RENDER_EXTERNAL_URL) {
+  process.env.WEB_URL = process.env.RENDER_EXTERNAL_URL;
+  process.env.API_URL = process.env.RENDER_EXTERNAL_URL;
+}
+
 // Initialize Sentry after env vars are loaded and before NestJS bootstrap
 initSentry();
 

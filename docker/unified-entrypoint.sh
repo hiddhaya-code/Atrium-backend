@@ -12,6 +12,13 @@ for var in DATABASE_URL DIRECT_URL BETTER_AUTH_SECRET WEB_URL API_URL; do
   fi
 done
 
+# Auto-detect Render external URL if running on Render
+if [ -n "${RENDER_EXTERNAL_URL}" ]; then
+  echo "Render environment detected: RENDER_EXTERNAL_URL=${RENDER_EXTERNAL_URL}"
+  export WEB_URL="${RENDER_EXTERNAL_URL}"
+  export API_URL="${RENDER_EXTERNAL_URL}"
+fi
+
 # Caddy rewrites the Origin of every /api request to WEB_URL, and the API only
 # trusts that origin. Left unset, the first sign-in works (no cookie, so the
 # origin is never checked) and every later one fails with "Invalid origin".

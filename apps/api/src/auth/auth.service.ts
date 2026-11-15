@@ -1069,8 +1069,15 @@ export class AuthService {
   async trustedOriginsFor(request?: Request): Promise<string[]> {
     const webUrl: string = this.config.get("WEB_URL", "http://localhost:3000");
     const origins: string[] = [webUrl, publicApiUrl(this.config)];
+    const renderUrl: string | undefined = this.config.get("RENDER_EXTERNAL_URL");
+    if (renderUrl && !origins.includes(renderUrl)) {
+      origins.push(renderUrl);
+    }
     const host: string | null = requestHost(request);
     if (!host || origins.some((origin: string) => new URL(origin).hostname === host)) return origins;
+    if (host.endsWith(".onrender.com") || host.endsWith(".railway.app")) {
+      return [...origins, `https://${host}`];
+    }
     return (await this.customDomainOrgId(host)) ? [...origins, `https://${host}`] : origins;
   }
 
