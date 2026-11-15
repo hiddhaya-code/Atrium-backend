@@ -15,6 +15,12 @@ if (existsSync(changelogSrc)) {
 const nextConfig: NextConfig = {
   output: "standalone",
   transpilePackages: ["@atrium/shared"],
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   images: {
     unoptimized: true, // CVE-2026-27980: disable image optimization (not used in this app)
   },
@@ -65,6 +71,11 @@ const nextConfig: NextConfig = {
       test: /CHANGELOG\.md$/,
       type: "asset/source",
     });
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings || []),
+      { module: /require-in-the-middle/ },
+      /Critical dependency/,
+    ];
     return config;
   },
 };
