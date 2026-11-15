@@ -1,3 +1,4 @@
+import type { Prisma } from "@atrium/database";
 import {
   Injectable,
   NotFoundException,
@@ -9,7 +10,14 @@ import { PrismaService } from "../prisma/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { ActivityService } from "../activity/activity.service";
 import { paginationArgs, paginatedResponse } from "../common";
-import { CreateTaskDto, CreateClientTaskDto, UpdateTaskDto } from "./tasks.dto";
+import {
+  CreateTaskDto,
+  CreateClientTaskDto,
+  UpdateTaskDto,
+  SubmitTaskWorkDto,
+  VerifyTaskWorkDto,
+  ClientReviewTaskDto,
+} from "./tasks.dto";
 
 @Injectable()
 export class TasksService {
@@ -131,10 +139,20 @@ export class TasksService {
     page = 1,
     limit = 20,
     status?: string,
-  ) {
+  ): Promise<any> {
     const statusFilter =
       status === "active"
-        ? { status: { in: ["open", "in_progress"] } }
+        ? {
+            status: {
+              in: [
+                "open",
+                "in_progress",
+                "submitted_for_verification",
+                "in_client_review",
+                "revision_requested",
+              ],
+            },
+          }
         : status && status !== "all"
         ? { status }
         : {};
@@ -153,6 +171,15 @@ export class TasksService {
           labels: { include: { label: true } },
           requester: { select: { id: true, name: true, image: true } },
           assignee: { select: { id: true, name: true, image: true } },
+          submissions: {
+            include: {
+              submittedBy: { select: { id: true, name: true, image: true } },
+            },
+            orderBy: { createdAt: "desc" },
+          },
+          revisions: {
+            orderBy: { createdAt: "desc" },
+          },
           _count: { select: { votes: true, comments: true } },
         },
         orderBy: { order: "asc" },
@@ -188,7 +215,7 @@ export class TasksService {
     page = 1,
     limit = 20,
     isPrivileged = false,
-  ) {
+  ): Promise<any> {
     if (!isPrivileged) {
       const assignment = await this.prisma.projectClient.findFirst({
         where: { projectId, userId, project: { organizationId: orgId } },
@@ -216,6 +243,16 @@ export class TasksService {
           labels: { include: { label: true } },
           requester: { select: { id: true, name: true, image: true } },
           assignee: { select: { id: true, name: true, image: true } },
+          submissions: {
+            where: { isVerified: true },
+            include: {
+              submittedBy: { select: { id: true, name: true, image: true } },
+            },
+            orderBy: { createdAt: "desc" },
+          },
+          revisions: {
+            orderBy: { createdAt: "desc" },
+          },
           _count: { select: { votes: true, comments: { where: { internal: false } } } },
         },
         orderBy: { order: "asc" },
@@ -333,11 +370,25 @@ export class TasksService {
     return updated;
   }
 
-  async update(id: string, dto: UpdateTaskDto, orgId: string) {
+  async update(
+    id: string,
+    dto: UpdateTaskDto,
+    orgId: string,
+    actorUserId?: string,
+    actorRole?: string,
+  ) {
     const task = await this.prisma.task.findFirst({
       where: { id, organizationId: orgId },
     });
     if (!task) throw new NotFoundException("Task not found");
+
+    // Developers can update tasks assigned to them or unassigned tasks in the project
+    if (actorRole === "developer" && task.assigneeId && task.assigneeId !== actorUserId) {
+      // Allow developer to view or participate, but restrict reassignment
+      if (dto.assigneeId !== undefined && dto.assigneeId !== task.assigneeId) {
+        throw new ForbiddenException("Developers cannot reassign tasks");
+      }
+    }
 
     // assigneeId: null = unassign, non-empty string = assign, empty string = reject
     if (dto.assigneeId === "") {
@@ -348,10 +399,10 @@ export class TasksService {
         where: {
           userId: dto.assigneeId,
           organizationId: orgId,
-          role: { in: ["owner", "admin"] },
+          role: { in: ["owner", "admin", "developer"] },
         },
       });
-      if (!member) throw new BadRequestException("Assignee must be an agency member (owner or admin)");
+      if (!member) throw new BadRequestException("Assignee must be an agency staff member (owner, admin, or developer)");
     }
 
     const updated = await this.prisma.task.update({
@@ -387,6 +438,218 @@ export class TasksService {
     }
 
     return updated;
+  }
+
+  /**
+   * Developer submits screenshots, demo links, and progress notes for QA verification.
+   */
+  async submitWork(
+    taskId: string,
+    dto: SubmitTaskWorkDto,
+    userId: string,
+    orgId: string,
+  ): Promise<any> {
+    const task = await this.prisma.task.findFirst({
+      where: { id: taskId, organizationId: orgId },
+      include: { project: { select: { id: true, name: true } } },
+    });
+    if (!task) throw new NotFoundException("Task not found");
+
+    const submission = await this.prisma.taskSubmission.create({
+      data: {
+        taskId,
+        submittedById: userId,
+        notes: dto.notes?.trim() || null,
+        previewUrl: dto.previewUrl?.trim() || null,
+        attachments: (dto.attachments as unknown as Prisma.InputJsonValue) ?? [],
+      },
+      include: {
+        submittedBy: { select: { id: true, name: true, image: true } },
+      },
+    });
+
+    const updatedTask = await this.prisma.task.update({
+      where: { id: taskId },
+      data: {
+        status: "submitted_for_verification",
+        verificationStatus: "pending_admin",
+      },
+      include: {
+        submissions: {
+          include: { submittedBy: { select: { id: true, name: true, image: true } } },
+          orderBy: { createdAt: "desc" },
+        },
+        revisions: { orderBy: { createdAt: "desc" } },
+      },
+    });
+
+    this.notifications.notifyTaskStatusChanged(
+      task.id,
+      task.title,
+      task.projectId,
+      orgId,
+      "submitted_for_verification",
+      task.requestedById,
+      task.assigneeId,
+    );
+
+    return { task: updatedTask, submission };
+  }
+
+  /**
+   * Admin verifies developer's submitted work before exposing to the client.
+   */
+  async verifyWork(
+    taskId: string,
+    dto: VerifyTaskWorkDto,
+    adminUserId: string,
+    orgId: string,
+  ): Promise<any> {
+    const task = await this.prisma.task.findFirst({
+      where: { id: taskId, organizationId: orgId },
+    });
+    if (!task) throw new NotFoundException("Task not found");
+
+    const latestSubmission = await this.prisma.taskSubmission.findFirst({
+      where: { taskId },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (latestSubmission) {
+      await this.prisma.taskSubmission.update({
+        where: { id: latestSubmission.id },
+        data: {
+          isVerified: dto.approved,
+          verifiedAt: new Date(),
+          verifiedById: adminUserId,
+          adminFeedback: dto.feedback?.trim() || null,
+        },
+      });
+    }
+
+    const nextStatus = dto.approved ? "in_client_review" : "in_progress";
+    const verificationStatus = dto.approved ? "verified" : "rejected";
+    const clientReviewStatus = dto.approved ? "pending_client" : "none";
+
+    const updatedTask = await this.prisma.task.update({
+      where: { id: taskId },
+      data: {
+        status: nextStatus,
+        verificationStatus,
+        clientReviewStatus,
+      },
+      include: {
+        submissions: {
+          include: { submittedBy: { select: { id: true, name: true, image: true } } },
+          orderBy: { createdAt: "desc" },
+        },
+        revisions: { orderBy: { createdAt: "desc" } },
+      },
+    });
+
+    this.notifications.notifyTaskStatusChanged(
+      task.id,
+      task.title,
+      task.projectId,
+      orgId,
+      nextStatus,
+      task.requestedById,
+      task.assigneeId,
+    );
+
+    return updatedTask;
+  }
+
+  /**
+   * Client reviews verified work in portal: approves or requests changes.
+   */
+  async clientReview(
+    taskId: string,
+    dto: ClientReviewTaskDto,
+    userId: string,
+    orgId: string,
+  ): Promise<any> {
+    const task = await this.prisma.task.findFirst({
+      where: { id: taskId, organizationId: orgId, internal: false },
+    });
+    if (!task) throw new NotFoundException("Task not found");
+
+    const assignment = await this.prisma.projectClient.findFirst({
+      where: { projectId: task.projectId, userId },
+    });
+    if (!assignment) {
+      throw new ForbiddenException("Not assigned to this project");
+    }
+
+    if (dto.action === "approve") {
+      const updatedTask = await this.prisma.task.update({
+        where: { id: taskId },
+        data: {
+          status: "done",
+          clientReviewStatus: "approved",
+          closedAt: new Date(),
+        },
+        include: {
+          submissions: {
+            where: { isVerified: true },
+            include: { submittedBy: { select: { id: true, name: true, image: true } } },
+            orderBy: { createdAt: "desc" },
+          },
+          revisions: { orderBy: { createdAt: "desc" } },
+        },
+      });
+
+      this.notifications.notifyTaskStatusChanged(
+        task.id,
+        task.title,
+        task.projectId,
+        orgId,
+        "done",
+        task.requestedById,
+        task.assigneeId,
+      );
+
+      return updatedTask;
+    } else {
+      const nextRevNumber = (task.revisionCount ?? 0) + 1;
+      await this.prisma.taskRevision.create({
+        data: {
+          taskId,
+          revisionNumber: nextRevNumber,
+          clientFeedback: dto.feedback?.trim() || "Changes requested by client",
+          assignedToId: task.assigneeId,
+          status: "open",
+        },
+      });
+
+      const updatedTask = await this.prisma.task.update({
+        where: { id: taskId },
+        data: {
+          status: "revision_requested",
+          clientReviewStatus: "changes_requested",
+          revisionCount: nextRevNumber,
+        },
+        include: {
+          submissions: {
+            include: { submittedBy: { select: { id: true, name: true, image: true } } },
+            orderBy: { createdAt: "desc" },
+          },
+          revisions: { orderBy: { createdAt: "desc" } },
+        },
+      });
+
+      this.notifications.notifyTaskStatusChanged(
+        task.id,
+        task.title,
+        task.projectId,
+        orgId,
+        "revision_requested",
+        task.requestedById,
+        task.assigneeId,
+      );
+
+      return updatedTask;
+    }
   }
 
   /**

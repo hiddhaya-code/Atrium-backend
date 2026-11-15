@@ -28,6 +28,7 @@ model User {
   documentVersions   DocumentVersion[]
   tasksRequested     Task[]              @relation("TaskRequester")
   tasksAssigned      Task[]              @relation("TaskAssignee")
+  taskSubmissions    TaskSubmission[]
   timeEntries        TimeEntry[]
   apiKeys            ApiKey[]
   oauthClients       OauthClient[]
@@ -606,6 +607,10 @@ model Task {
   internal       Boolean   @default(false)
   updatedAt      DateTime  @updatedAt
 
+  verificationStatus String   @default("none") // "none" | "pending_admin" | "verified" | "rejected"
+  clientReviewStatus String   @default("none") // "none" | "pending_client" | "approved" | "changes_requested"
+  revisionCount      Int      @default(0)
+
   project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   requester   User?            @relation("TaskRequester", fields: [requestedById], references: [id], onDelete: SetNull)
   assignee    User?            @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
@@ -614,6 +619,8 @@ model Task {
   comments    Comment[]
   labels      TaskLabel[]
   timeEntries TimeEntry[]
+  submissions TaskSubmission[]
+  revisions   TaskRevision[]
 
   @@index([projectId])
   @@index([organizationId])
@@ -623,6 +630,44 @@ model Task {
   @@index([organizationId, dueDate])
   @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "task_title_trgm_idx")
   @@map("task")
+}
+
+model TaskSubmission {
+  id            String    @id @default(cuid())
+  taskId        String
+  submittedById String
+  notes         String?
+  previewUrl    String?
+  attachments   Json      @default("[]")
+  createdAt     DateTime  @default(now())
+  verifiedAt    DateTime?
+  verifiedById  String?
+  adminFeedback String?
+  isVerified    Boolean   @default(false)
+
+  task        Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  submittedBy User @relation(fields: [submittedById], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([submittedById])
+  @@map("task_submission")
+}
+
+model TaskRevision {
+  id             String    @id @default(cuid())
+  taskId         String
+  revisionNumber Int
+  clientFeedback String
+  adminNotes     String?
+  assignedToId   String?
+  status         String    @default("open") // "open" | "in_progress" | "resolved"
+  createdAt      DateTime  @default(now())
+  resolvedAt     DateTime?
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("task_revision")
 }
 
 model DecisionOption {

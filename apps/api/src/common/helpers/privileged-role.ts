@@ -9,3 +9,10 @@ import { ROLES } from "@atrium/shared";
 export function isPrivilegedRole(role: string | undefined): boolean {
   return role === ROLES.OWNER || role === ROLES.ADMIN;
 }
+
+/**
+ * Agency staff members (owners, admins, and developers).
+ */
+export function isStaffRole(role: string | undefined): boolean {
+  return role === ROLES.OWNER || role === ROLES.ADMIN || role === ROLES.DEVELOPER;
+}

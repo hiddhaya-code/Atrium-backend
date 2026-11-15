@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: atrium-agency-dashboard
+    runtime: docker
+    dockerfilePath: Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: USE_BUILT_IN_DB
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: BETTER_AUTH_SECRET
+        generateValue: true
+      - key: STORAGE_PROVIDER
+        value: local
+      - key: UPLOAD_DIR
+        value: /app/uploads
+      - key: ALLOW_SIGNUPS
+        value: "true"
+      - key: WEB_URL
+        sync: false
+    disk:
+      name: atrium-uploads
+      mountPath: /app/uploads
+      sizeGB: 1

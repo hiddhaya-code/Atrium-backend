@@ -27,7 +27,7 @@ export class FilesController {
   constructor(private filesService: FilesService) {}
 
   @Post("upload")
-  @Roles("owner", "admin")
+  @Roles("owner", "admin", "developer")
   @PlanLimit("storage")
   @UseInterceptors(TempFileInterceptor("file", MAX_UPLOAD_BYTES))
   upload(
@@ -41,7 +41,7 @@ export class FilesController {
   }
 
   @Post("link")
-  @Roles("owner", "admin")
+  @Roles("owner", "admin", "developer")
   createLink(
     @Body() dto: CreateFileLinkDto,
     @CurrentOrg("id") orgId: string,

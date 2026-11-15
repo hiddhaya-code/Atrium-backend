@@ -1,8 +1,18 @@
-export type TaskStatus = "open" | "in_progress" | "done" | "cancelled";
+export type TaskStatus =
+  | "open"
+  | "in_progress"
+  | "submitted_for_verification"
+  | "in_client_review"
+  | "revision_requested"
+  | "done"
+  | "cancelled";
 
 export const TASK_STATUS_BADGE: Record<TaskStatus, string> = {
   open: "bg-gray-500/15 text-gray-700 dark:text-gray-300",
   in_progress: "bg-blue-500/20 text-blue-700 dark:text-blue-300",
+  submitted_for_verification: "bg-amber-500/20 text-amber-700 dark:text-amber-300",
+  in_client_review: "bg-purple-500/20 text-purple-700 dark:text-purple-300",
+  revision_requested: "bg-orange-500/20 text-orange-700 dark:text-orange-300",
   done: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300",
   cancelled: "bg-rose-500/20 text-rose-700 dark:text-rose-300",
 };
@@ -10,6 +20,9 @@ export const TASK_STATUS_BADGE: Record<TaskStatus, string> = {
 export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
   open: "Open",
   in_progress: "In Progress",
+  submitted_for_verification: "Awaiting Verification",
+  in_client_review: "Client Review",
+  revision_requested: "Revisions Requested",
   done: "Done",
   cancelled: "Cancelled",
 };
@@ -17,6 +30,21 @@ export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
 export const TASK_STATUS_OPTIONS: { value: TaskStatus; label: string; color: string }[] = [
   { value: "open", label: TASK_STATUS_LABEL.open, color: TASK_STATUS_BADGE.open },
   { value: "in_progress", label: TASK_STATUS_LABEL.in_progress, color: TASK_STATUS_BADGE.in_progress },
+  {
+    value: "submitted_for_verification",
+    label: TASK_STATUS_LABEL.submitted_for_verification,
+    color: TASK_STATUS_BADGE.submitted_for_verification,
+  },
+  {
+    value: "in_client_review",
+    label: TASK_STATUS_LABEL.in_client_review,
+    color: TASK_STATUS_BADGE.in_client_review,
+  },
+  {
+    value: "revision_requested",
+    label: TASK_STATUS_LABEL.revision_requested,
+    color: TASK_STATUS_BADGE.revision_requested,
+  },
   { value: "done", label: TASK_STATUS_LABEL.done, color: TASK_STATUS_BADGE.done },
   { value: "cancelled", label: TASK_STATUS_LABEL.cancelled, color: TASK_STATUS_BADGE.cancelled },
 ];

@@ -27,7 +27,7 @@ export { bearerToken } from "./helpers/bearer-token";
 export { MCP_ACTOR_ROLES } from "./helpers/mcp-actor-roles";
 export { mcpOAuthEnabled, mcpOAuthUnavailableReason, mcpResourceUrl, hashOAuthToken } from "./helpers/mcp-oauth";
 export { ORG_MEMBER_FIELDS } from "./helpers/org-member-fields";
-export { isPrivilegedRole } from "./helpers/privileged-role";
+export { isPrivilegedRole, isStaffRole } from "./helpers/privileged-role";
 export { revokeCredentialsIfDemoted, revokeMemberCredentials } from "./helpers/member-credentials";
 export { BLOCKED_EXTENSIONS } from "./utils/blocked-extensions";
 export type {

@@ -48,16 +48,22 @@ export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
 export const ROLES = {
   OWNER: "owner",
   ADMIN: "admin",
+  DEVELOPER: "developer",
   MEMBER: "member",
 } as const;
 
 export type Role = (typeof ROLES)[keyof typeof ROLES];
+
+export const STAFF_ROLES: readonly string[] = [ROLES.OWNER, ROLES.ADMIN, ROLES.DEVELOPER];
 
 export const DELETED_USER_SENTINEL = "deleted";
 
 export const TASK_STATUSES = {
   OPEN: "open",
   IN_PROGRESS: "in_progress",
+  SUBMITTED_FOR_VERIFICATION: "submitted_for_verification",
+  IN_CLIENT_REVIEW: "in_client_review",
+  REVISION_REQUESTED: "revision_requested",
   DONE: "done",
   CANCELLED: "cancelled",
 } as const;
@@ -216,6 +222,9 @@ export const INTEGRATION_EVENT_GROUPS = [
       { id: "task.created", label: "Task created" },
       { id: "task.status_changed", label: "Task status changed" },
       { id: "task.assigned", label: "Task assigned" },
+      { id: "task.submitted_for_verification", label: "Task submitted for verification" },
+      { id: "task.verified", label: "Task verified by admin" },
+      { id: "task.client_reviewed", label: "Task reviewed by client" },
       { id: "client_request.created", label: "Client request submitted" },
       { id: "decision.closed", label: "Decision closed" },
     ],

@@ -1,7 +1,23 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { X, Link2, Trash2, Check, Plus, Vote, Lock } from "lucide-react";
+import {
+  X,
+  Link2,
+  Trash2,
+  Check,
+  Plus,
+  Vote,
+  Lock,
+  Upload,
+  ExternalLink,
+  Image as ImageIcon,
+  CheckCircle2,
+  AlertCircle,
+  RotateCcw,
+  ShieldCheck,
+  Clock,
+} from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { copyToClipboard } from "@/lib/clipboard";
 import { useToast } from "@/components/toast";
@@ -13,6 +29,29 @@ import { ColorPatchGrid, PRESET_COLORS } from "@/components/color-patch-grid";
 import { TASK_STATUS_OPTIONS } from "@/lib/task-status";
 import { ManualEntryModal } from "@/components/manual-entry-modal";
 import { invalidate } from "@/lib/cached";
+
+export interface TaskSubmissionRecord {
+  id: string;
+  notes?: string | null;
+  previewUrl?: string | null;
+  attachments?: { fileId?: string; filename: string; url?: string; storageKey?: string }[];
+  createdAt: string;
+  verifiedAt?: string | null;
+  verifiedById?: string | null;
+  adminFeedback?: string | null;
+  isVerified: boolean;
+  submittedBy?: { id: string; name: string; image?: string | null };
+}
+
+export interface TaskRevisionRecord {
+  id: string;
+  revisionNumber: number;
+  clientFeedback: string;
+  adminNotes?: string | null;
+  status: string;
+  createdAt: string;
+  resolvedAt?: string | null;
+}
 
 export interface TaskDetailRecord {
   id: string;
@@ -33,6 +72,11 @@ export interface TaskDetailRecord {
   options?: { id: string; label: string; order: number; _count: { votes: number } }[];
   votes?: { optionId: string }[];
   _count?: { comments: number; votes?: number };
+  verificationStatus?: string;
+  clientReviewStatus?: string;
+  revisionCount?: number;
+  submissions?: TaskSubmissionRecord[];
+  revisions?: TaskRevisionRecord[];
 }
 
 export interface TaskDetailMember {
@@ -100,6 +144,108 @@ export function TaskDetailModal({
   const [newLabelColor, setNewLabelColor] = useState<string>(PRESET_COLORS[0].hex);
   const [savingLabel, setSavingLabel] = useState(false);
   const [labelError, setLabelError] = useState("");
+
+  // Workflow states
+  const [submitNotes, setSubmitNotes] = useState("");
+  const [submitPreviewUrl, setSubmitPreviewUrl] = useState("");
+  const [submitAttachments, setSubmitAttachments] = useState<{ filename: string; url: string; fileId?: string }[]>([]);
+  const [showSubmitForm, setShowSubmitForm] = useState(false);
+  const [submittingWork, setSubmittingWork] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
+
+  const [verifyFeedback, setVerifyFeedback] = useState("");
+  const [verifying, setVerifying] = useState(false);
+
+  const [clientFeedback, setClientFeedback] = useState("");
+  const [clientReviewing, setClientReviewing] = useState(false);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !projectId) return;
+    setUploadingFile(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await apiFetch<{ id: string; filename: string; url?: string }>(`/files/upload?projectId=${projectId}`, {
+        method: "POST",
+        body: formData,
+      });
+      setSubmitAttachments((prev) => [
+        ...prev,
+        { fileId: res.id, filename: res.filename, url: res.url || `/files/${res.id}/download` },
+      ]);
+      success("Screenshot attached");
+    } catch (err) {
+      showError(err instanceof Error ? err.message : "Failed to upload screenshot");
+    } finally {
+      setUploadingFile(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleSubmitWork = async () => {
+    setSubmittingWork(true);
+    try {
+      await apiFetch(`/tasks/${task.id}/submit-work`, {
+        method: "POST",
+        body: JSON.stringify({
+          notes: submitNotes,
+          previewUrl: submitPreviewUrl,
+          attachments: submitAttachments,
+        }),
+      });
+      success("Work submitted for verification!");
+      setShowSubmitForm(false);
+      setSubmitNotes("");
+      setSubmitPreviewUrl("");
+      setSubmitAttachments([]);
+      onChange();
+    } catch (err) {
+      showError(err instanceof Error ? err.message : "Submission failed");
+    } finally {
+      setSubmittingWork(false);
+    }
+  };
+
+  const handleVerifyWork = async (approved: boolean) => {
+    setVerifying(true);
+    try {
+      await apiFetch(`/tasks/${task.id}/verify`, {
+        method: "POST",
+        body: JSON.stringify({
+          approved,
+          feedback: verifyFeedback,
+        }),
+      });
+      success(approved ? "Work verified and sent to client!" : "Work returned with feedback");
+      setVerifyFeedback("");
+      onChange();
+    } catch (err) {
+      showError(err instanceof Error ? err.message : "Verification action failed");
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleClientReview = async (action: "approve" | "request_changes") => {
+    setClientReviewing(true);
+    try {
+      await apiFetch(`/tasks/${task.id}/client-review`, {
+        method: "POST",
+        body: JSON.stringify({
+          action,
+          feedback: clientFeedback,
+        }),
+      });
+      success(action === "approve" ? "Task approved!" : "Change request submitted");
+      setClientFeedback("");
+      onChange();
+    } catch (err) {
+      showError(err instanceof Error ? err.message : "Review submission failed");
+    } finally {
+      setClientReviewing(false);
+    }
+  };
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -575,6 +721,317 @@ export function TaskDetailModal({
                   </div>
                 );
               })()}
+
+              {/* ─── Agency Workflow: QA Verification Banner (Admin View) ─── */}
+              {isAgency && task.status === "submitted_for_verification" && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300 font-medium text-sm">
+                    <ShieldCheck size={18} />
+                    <span>QA Verification Required</span>
+                  </div>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    Work has been submitted by the developer. Please inspect the preview link and screenshots below before releasing to the client.
+                  </p>
+                  <div>
+                    <textarea
+                      value={verifyFeedback}
+                      onChange={(e) => setVerifyFeedback(e.target.value)}
+                      placeholder="Add verification notes or feedback for the developer..."
+                      rows={2}
+                      className="w-full text-xs p-2 border border-[var(--border)] rounded-lg bg-[var(--background)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleVerifyWork(true)}
+                      disabled={verifying}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                    >
+                      <CheckCircle2 size={14} />
+                      {verifying ? "Approving..." : "Verify & Send to Client"}
+                    </button>
+                    <button
+                      onClick={() => handleVerifyWork(false)}
+                      disabled={verifying}
+                      className="flex items-center gap-1.5 px-3 py-1.5 border border-rose-300 text-rose-700 dark:text-rose-300 rounded-lg text-xs font-medium hover:bg-rose-50 dark:hover:bg-rose-950/20 disabled:opacity-50 transition-colors"
+                    >
+                      <RotateCcw size={14} />
+                      {verifying ? "Processing..." : "Reject & Request Fixes"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ─── Agency Workflow: Client Review Banner (Client View) ─── */}
+              {!isAgency && task.status === "in_client_review" && (
+                <div className="rounded-xl border border-purple-500/30 bg-purple-500/10 p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-purple-700 dark:text-purple-300 font-medium text-sm">
+                    <CheckCircle2 size={18} />
+                    <span>Work Ready for Your Approval</span>
+                  </div>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    The team has verified this task. Please review the submitted demo and screenshots below, then approve or request changes.
+                  </p>
+                  <div>
+                    <textarea
+                      value={clientFeedback}
+                      onChange={(e) => setClientFeedback(e.target.value)}
+                      placeholder="Provide revision notes or feedback if requesting changes..."
+                      rows={2}
+                      className="w-full text-xs p-2 border border-[var(--border)] rounded-lg bg-[var(--background)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleClientReview("approve")}
+                      disabled={clientReviewing}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                    >
+                      <Check size={14} />
+                      {clientReviewing ? "Approving..." : "Approve Work"}
+                    </button>
+                    <button
+                      onClick={() => handleClientReview("request_changes")}
+                      disabled={clientReviewing}
+                      className="flex items-center gap-1.5 px-3 py-1.5 border border-orange-300 text-orange-700 dark:text-orange-300 rounded-lg text-xs font-medium hover:bg-orange-50 dark:hover:bg-orange-950/20 disabled:opacity-50 transition-colors"
+                    >
+                      <RotateCcw size={14} />
+                      {clientReviewing ? "Submitting..." : "Request Changes"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ─── Agency Workflow: Work Submission Form (Developer / Agency) ─── */}
+              {isAgency &&
+                (task.status === "open" ||
+                  task.status === "in_progress" ||
+                  task.status === "revision_requested") && (
+                  <div className="rounded-xl border border-[var(--border)] p-4 space-y-3 bg-[var(--muted)]/20">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 font-medium text-sm">
+                        <Upload size={16} className="text-[var(--primary)]" />
+                        <span>Submit Work for QA Verification</span>
+                      </div>
+                      <button
+                        onClick={() => setShowSubmitForm((v) => !v)}
+                        className="text-xs text-[var(--primary)] font-medium hover:underline"
+                      >
+                        {showSubmitForm ? "Cancel" : "Open Form"}
+                      </button>
+                    </div>
+
+                    {showSubmitForm && (
+                      <div className="space-y-3 pt-2">
+                        <div>
+                          <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">
+                            Live Preview or Demo Staging URL
+                          </label>
+                          <input
+                            type="url"
+                            value={submitPreviewUrl}
+                            onChange={(e) => setSubmitPreviewUrl(e.target.value)}
+                            placeholder="https://staging.agency.com/feature"
+                            className="w-full text-xs px-3 py-1.5 border border-[var(--border)] rounded-lg bg-[var(--background)]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">
+                            Completion Notes & Summary of Work
+                          </label>
+                          <textarea
+                            value={submitNotes}
+                            onChange={(e) => setSubmitNotes(e.target.value)}
+                            placeholder="Explain what was implemented or resolved..."
+                            rows={3}
+                            className="w-full text-xs p-2 border border-[var(--border)] rounded-lg bg-[var(--background)]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">
+                            Attach Screenshots / Proof of Work
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <label className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 border border-[var(--border)] rounded-lg bg-[var(--background)] text-xs font-medium hover:bg-[var(--muted)]">
+                              <ImageIcon size={14} />
+                              <span>{uploadingFile ? "Uploading..." : "Upload Screenshot"}</span>
+                              <input
+                                type="file"
+                                accept="image/*,.pdf"
+                                onChange={handleFileUpload}
+                                disabled={uploadingFile}
+                                className="hidden"
+                              />
+                            </label>
+                          </div>
+                          {submitAttachments.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {submitAttachments.map((att, i) => (
+                                <div
+                                  key={i}
+                                  className="flex items-center gap-1.5 text-xs px-2 py-1 rounded bg-[var(--muted)] border border-[var(--border)]"
+                                >
+                                  <ImageIcon size={12} />
+                                  <span className="truncate max-w-[150px]">{att.filename}</span>
+                                  <button
+                                    onClick={() =>
+                                      setSubmitAttachments((prev) => prev.filter((_, idx) => idx !== i))
+                                    }
+                                    className="text-[var(--muted-foreground)] hover:text-red-500"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="pt-2">
+                          <button
+                            onClick={handleSubmitWork}
+                            disabled={submittingWork || uploadingFile}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-[var(--primary)] text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+                          >
+                            <ShieldCheck size={14} />
+                            {submittingWork ? "Submitting..." : "Submit to Admin QA"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+              {/* ─── Agency Workflow: Submissions & Screenshots Gallery ─── */}
+              {task.submissions && task.submissions.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+                    Work Submissions & Screenshots ({task.submissions.length})
+                  </h3>
+                  <div className="space-y-2">
+                    {task.submissions.map((sub) => (
+                      <div
+                        key={sub.id}
+                        className="rounded-lg border border-[var(--border)] p-3 text-xs space-y-2 bg-[var(--card)]"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {sub.submittedBy && (
+                              <Avatar
+                                name={sub.submittedBy.name}
+                                image={sub.submittedBy.image}
+                                size={18}
+                              />
+                            )}
+                            <span className="font-medium">{sub.submittedBy?.name ?? "Developer"}</span>
+                            <span className="text-[var(--muted-foreground)]">
+                              {new Date(sub.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <div>
+                            {sub.isVerified ? (
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-medium text-[11px]">
+                                Verified by Admin
+                              </span>
+                            ) : sub.adminFeedback ? (
+                              <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-700 dark:text-rose-300 font-medium text-[11px]">
+                                Returned with Fixes
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-medium text-[11px]">
+                                Awaiting QA
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {sub.previewUrl && (
+                          <div className="flex items-center gap-1.5 text-[var(--primary)]">
+                            <ExternalLink size={13} />
+                            <a
+                              href={sub.previewUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-medium hover:underline truncate"
+                            >
+                              {sub.previewUrl}
+                            </a>
+                          </div>
+                        )}
+
+                        {sub.notes && <p className="text-[var(--foreground)] whitespace-pre-wrap">{sub.notes}</p>}
+
+                        {sub.adminFeedback && (
+                          <div className="p-2 rounded bg-rose-50 dark:bg-rose-950/20 border border-rose-200 text-rose-800 dark:text-rose-200">
+                            <span className="font-semibold">Admin feedback: </span>
+                            {sub.adminFeedback}
+                          </div>
+                        )}
+
+                        {sub.attachments && Array.isArray(sub.attachments) && sub.attachments.length > 0 && (
+                          <div className="space-y-1.5 pt-1">
+                            <span className="text-[11px] font-medium text-[var(--muted-foreground)]">
+                              Screenshots & Assets:
+                            </span>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                              {sub.attachments.map((att, attIdx) => (
+                                <a
+                                  key={attIdx}
+                                  href={att.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="group relative block overflow-hidden rounded border border-[var(--border)] bg-[var(--muted)] aspect-video hover:opacity-90 transition-opacity"
+                                >
+                                  {att.url &&
+                                  (att.filename.match(/\.(png|jpg|jpeg|webp|gif)$/i) ||
+                                    att.url.startsWith("data:image")) ? (
+                                    <img
+                                      src={att.url}
+                                      alt={att.filename}
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="flex h-full items-center justify-center p-2 text-center text-[11px]">
+                                      {att.filename}
+                                    </div>
+                                  )}
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[11px] font-medium transition-opacity">
+                                    View Full
+                                  </div>
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ─── Agency Workflow: Revisions History ─── */}
+              {task.revisions && task.revisions.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+                    Revision Requests ({task.revisions.length})
+                  </h3>
+                  <div className="space-y-1.5">
+                    {task.revisions.map((rev) => (
+                      <div
+                        key={rev.id}
+                        className="rounded border border-orange-500/20 bg-orange-500/5 p-2.5 text-xs space-y-1"
+                      >
+                        <div className="flex items-center justify-between text-orange-700 dark:text-orange-300 font-medium">
+                          <span>Revision #{rev.revisionNumber}</span>
+                          <span className="text-[11px] text-[var(--muted-foreground)]">
+                            {new Date(rev.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-[var(--foreground)]">{rev.clientFeedback}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Comments */}
               <div className="pt-2">

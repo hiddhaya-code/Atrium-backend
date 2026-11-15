@@ -124,7 +124,7 @@ export class ClientsService {
         throw new BadRequestException("Cannot demote the last owner");
       }
     }
-    const validRoles = ["owner", "admin", "member"];
+    const validRoles = ["owner", "admin", "developer", "member"];
     if (!validRoles.includes(newRole)) {
       throw new BadRequestException("Invalid role");
     }

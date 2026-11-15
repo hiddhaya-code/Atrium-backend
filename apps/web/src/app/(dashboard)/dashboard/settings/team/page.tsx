@@ -41,9 +41,11 @@ interface PaginatedResponse<T> {
 const roleColor = (role: string): string => {
   switch (role) {
     case "owner":
-      return "bg-purple-100 text-purple-700";
+      return "bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300";
     case "admin":
-      return "bg-blue-100 text-blue-700";
+      return "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300";
+    case "developer":
+      return "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300";
     default:
       return "bg-[var(--muted)] text-[var(--foreground)]";
   }
@@ -64,7 +66,7 @@ export default function TeamPage(): React.ReactElement {
   const [copied, setCopied] = useState<string>("");
 
   const [email, setEmail] = useState<string>("");
-  const [inviteRole, setInviteRole] = useState<"admin" | "owner">("admin");
+  const [inviteRole, setInviteRole] = useState<"admin" | "owner" | "developer">("developer");
   const [inviteError, setInviteError] = useState<string>("");
   const [inviteLink, setInviteLink] = useState<string>("");
   const [inviting, setInviting] = useState<boolean>(false);
@@ -322,10 +324,11 @@ export default function TeamPage(): React.ReactElement {
                 />
                 <select
                   value={inviteRole}
-                  onChange={(e) => setInviteRole(e.target.value as "admin" | "owner")}
+                  onChange={(e) => setInviteRole(e.target.value as "admin" | "owner" | "developer")}
                   aria-label="Role"
                   className="px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-sm"
                 >
+                  <option value="developer">Developer</option>
                   <option value="admin">Admin</option>
                   <option value="owner">Owner</option>
                 </select>
@@ -456,6 +459,7 @@ export default function TeamPage(): React.ReactElement {
                       >
                         <option value="owner">owner</option>
                         <option value="admin">admin</option>
+                        <option value="developer">developer</option>
                       </select>
                     ) : (
                       <span className={`text-xs px-2 py-1 rounded-full ${roleColor(member.role)}`}>{member.role}</span>

@@ -22,6 +22,9 @@ import {
   ReorderTasksDto,
   CastVoteDto,
   TaskListQueryDto,
+  SubmitTaskWorkDto,
+  VerifyTaskWorkDto,
+  ClientReviewTaskDto,
 } from "./tasks.dto";
 import {
   AuthGuard,
@@ -67,12 +70,12 @@ export class TasksController {
   }
 
   @Get("project/:projectId")
-  @Roles("owner", "admin")
+  @Roles("owner", "admin", "developer")
   findByProject(
     @Param("projectId") projectId: string,
     @CurrentOrg("id") orgId: string,
     @Query() query: TaskListQueryDto,
-  ) {
+  ): Promise<any> {
     return this.tasksService.findByProject(
       projectId,
       orgId,
@@ -89,7 +92,7 @@ export class TasksController {
     @CurrentOrg("id") orgId: string,
     @Query() pagination: PaginationQueryDto,
     @CurrentMember("role") role?: string,
-  ) {
+  ): Promise<any> {
     const isPrivileged = isPrivilegedRole(role);
     return this.tasksService.findByProjectForClient(
       projectId,
@@ -162,13 +165,47 @@ export class TasksController {
   }
 
   @Put(":id")
-  @Roles("owner", "admin")
+  @Roles("owner", "admin", "developer")
   update(
     @Param("id") id: string,
     @Body() dto: UpdateTaskDto,
     @CurrentOrg("id") orgId: string,
+    @CurrentUser("id") userId: string,
+    @CurrentMember("role") role: string,
   ) {
-    return this.tasksService.update(id, dto, orgId);
+    return this.tasksService.update(id, dto, orgId, userId, role);
+  }
+
+  @Post(":id/submit-work")
+  @Roles("owner", "admin", "developer")
+  submitWork(
+    @Param("id") id: string,
+    @Body() dto: SubmitTaskWorkDto,
+    @CurrentUser("id") userId: string,
+    @CurrentOrg("id") orgId: string,
+  ): Promise<any> {
+    return this.tasksService.submitWork(id, dto, userId, orgId);
+  }
+
+  @Post(":id/verify")
+  @Roles("owner", "admin")
+  verifyWork(
+    @Param("id") id: string,
+    @Body() dto: VerifyTaskWorkDto,
+    @CurrentUser("id") userId: string,
+    @CurrentOrg("id") orgId: string,
+  ): Promise<any> {
+    return this.tasksService.verifyWork(id, dto, userId, orgId);
+  }
+
+  @Post(":id/client-review")
+  clientReview(
+    @Param("id") id: string,
+    @Body() dto: ClientReviewTaskDto,
+    @CurrentUser("id") userId: string,
+    @CurrentOrg("id") orgId: string,
+  ): Promise<any> {
+    return this.tasksService.clientReview(id, dto, userId, orgId);
   }
 
   @Delete(":id")

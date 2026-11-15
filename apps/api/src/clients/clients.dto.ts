@@ -13,7 +13,7 @@ export class ListMembersQueryDto extends PaginationQueryDto {
 
 export class ChangeRoleDto {
   @IsString()
-  @IsIn(["owner", "admin", "member"])
+  @IsIn(["owner", "admin", "developer", "member"])
   role!: string;
 }
 

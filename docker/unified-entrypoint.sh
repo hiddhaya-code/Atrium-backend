@@ -66,6 +66,11 @@ if [ "${SKIP_DB_PUSH}" = "true" ]; then
 else
   MIGRATION_URL="${DIRECT_URL:-$DATABASE_URL}"
 
+  PRISMA_BIN="./packages/database/node_modules/.bin/prisma"
+  if [ ! -f "$PRISMA_BIN" ]; then
+    PRISMA_BIN="bunx prisma"
+  fi
+
   # Extensions the schema needs (pg_trgm for the search indexes); must exist before db push
   DATABASE_URL="$MIGRATION_URL" bun run ./packages/database/scripts/ensure-extensions.ts
 
@@ -74,7 +79,7 @@ else
 
   # First, create new tables without dropping old columns
   echo "Creating new tables..."
-  DATABASE_URL="$MIGRATION_URL" ./packages/database/node_modules/.bin/prisma db push --schema=./packages/database/prisma/schema.prisma --skip-generate 2>/dev/null || true
+  DATABASE_URL="$MIGRATION_URL" $PRISMA_BIN db push --schema=./packages/database/prisma/schema.prisma --skip-generate 2>/dev/null || true
 
   # Migrate legacy document data from file table to document table
   echo "Running data migrations..."
@@ -83,7 +88,7 @@ else
 
   # Now push schema with accept-data-loss to drop old columns
   echo "Syncing database schema..."
-  DATABASE_URL="$MIGRATION_URL" ./packages/database/node_modules/.bin/prisma db push --schema=./packages/database/prisma/schema.prisma --skip-generate --accept-data-loss
+  DATABASE_URL="$MIGRATION_URL" $PRISMA_BIN db push --schema=./packages/database/prisma/schema.prisma --skip-generate --accept-data-loss
   echo "Database schema synced."
 
   # Apply partial unique index on time_entry (one running entry per user)
@@ -135,7 +140,7 @@ for i in $(seq 1 30); do
     echo "API failed to start. Check logs above."
     break
   fi
-  if wget -qO- http://127.0.0.1:3001/api/health >/dev/null 2>&1; then
+  if curl -sf http://127.0.0.1:3001/api/health >/dev/null 2>&1 || wget -qO- http://127.0.0.1:3001/api/health >/dev/null 2>&1; then
     echo "API ready (took ${i}s)"
     break
   fi

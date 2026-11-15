@@ -675,33 +675,36 @@ export class AuthService {
    * Called after organization creation.
    */
   async seedOrganizationDefaults(organizationId: string) {
-    await this.prisma.$transaction(async (tx) => {
-      for (const status of DEFAULT_STATUSES) {
-        await tx.projectStatus.create({
+    await this.prisma.$transaction(
+      async (tx) => {
+        for (const status of DEFAULT_STATUSES) {
+          await tx.projectStatus.create({
+            data: {
+              name: status.name,
+              slug: status.slug,
+              order: status.order,
+              color: status.color,
+              organizationId,
+            },
+          });
+        }
+        await tx.branding.create({
           data: {
-            name: status.name,
-            slug: status.slug,
-            order: status.order,
-            color: status.color,
             organizationId,
+            primaryColor: DEFAULT_BRANDING.primaryColor,
           },
         });
-      }
-      await tx.branding.create({
-        data: {
-          organizationId,
-          primaryColor: DEFAULT_BRANDING.primaryColor,
-        },
-      });
-      await tx.systemSettings.create({
-        data: { organizationId },
-      });
-      await tx.leadSource.createMany({
-        data: DEFAULT_LEAD_SOURCES.map((name) => ({ organizationId, name })),
-        skipDuplicates: true,
-      });
-      await seedDefaultPipelines(tx, organizationId);
-    });
+        await tx.systemSettings.create({
+          data: { organizationId },
+        });
+        await tx.leadSource.createMany({
+          data: DEFAULT_LEAD_SOURCES.map((name) => ({ organizationId, name })),
+          skipDuplicates: true,
+        });
+        await seedDefaultPipelines(tx, organizationId);
+      },
+      { timeout: 30000, maxWait: 10000 },
+    );
   }
 
   /** What passkeyAfterHook needs from Better Auth's after-hook context. */

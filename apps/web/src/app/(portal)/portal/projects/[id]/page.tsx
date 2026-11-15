@@ -1326,6 +1326,11 @@ export default function PortalProjectDetailPage() {
                         className={`flex-1 text-sm min-w-0 ${task.status === "done" || task.status === "cancelled" ? "line-through text-[var(--muted-foreground)]" : ""}`}
                       >
                         <span className="break-words">{task.title}</span>
+                        {task.status === "in_client_review" && (
+                          <span className="ml-2 shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-700 dark:text-purple-300 font-medium align-middle">
+                            Ready for your review
+                          </span>
+                        )}
                         {isOwnRequest && (
                           <span className="ml-2 shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-medium align-middle">
                             Your request

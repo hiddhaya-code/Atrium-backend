@@ -121,7 +121,13 @@ export function TasksSection({
 
   useEffect(() => {
     apiFetch<PaginatedResponse<OrgMember>>("/clients?limit=100")
-      .then((res) => setMembers(res.data.filter((m) => m.role === "owner" || m.role === "admin")))
+      .then((res) =>
+        setMembers(
+          res.data.filter(
+            (m) => m.role === "owner" || m.role === "admin" || m.role === "developer",
+          ),
+        ),
+      )
       .catch(console.error);
   }, []);
 
@@ -294,9 +300,12 @@ export function TasksSection({
               className={`pl-2 ${headerControl} ${quiet}`}
             >
               <option value="active">Active</option>
-              <option value="all">All</option>
+              <option value="submitted_for_verification">Awaiting QA</option>
+              <option value="in_client_review">Client Review</option>
+              <option value="revision_requested">Revisions</option>
               <option value="done">Done</option>
               <option value="cancelled">Cancelled</option>
+              <option value="all">All</option>
             </select>
           )}
           {tasks.length > 0 && (

@@ -90,7 +90,15 @@ export class UpdateTaskDto {
 
   @IsString()
   @IsOptional()
-  @IsIn(["open", "in_progress", "done", "cancelled"])
+  @IsIn([
+    "open",
+    "in_progress",
+    "submitted_for_verification",
+    "in_client_review",
+    "revision_requested",
+    "done",
+    "cancelled",
+  ])
   status?: string;
 
   // null = unassign, string = assign to userId
@@ -116,6 +124,59 @@ export class CastVoteDto {
 export class TaskListQueryDto extends PaginationQueryDto {
   @IsString()
   @IsOptional()
-  @IsIn(["active", "all", "open", "in_progress", "done", "cancelled"])
+  @IsIn([
+    "active",
+    "all",
+    "open",
+    "in_progress",
+    "submitted_for_verification",
+    "in_client_review",
+    "revision_requested",
+    "done",
+    "cancelled",
+  ])
   status?: string;
+}
+
+export class SubmitTaskWorkDto {
+  @IsString()
+  @IsOptional()
+  @MaxLength(5000)
+  notes?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(1000)
+  previewUrl?: string;
+
+  @IsArray()
+  @IsOptional()
+  attachments?: {
+    fileId?: string;
+    filename: string;
+    url?: string;
+    storageKey?: string;
+  }[];
+}
+
+export class VerifyTaskWorkDto {
+  @IsNotEmpty()
+  approved!: boolean;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(5000)
+  feedback?: string;
+}
+
+export class ClientReviewTaskDto {
+  @IsString()
+  @IsNotEmpty()
+  @IsIn(["approve", "request_changes"])
+  action!: "approve" | "request_changes";
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(5000)
+  feedback?: string;
 }
