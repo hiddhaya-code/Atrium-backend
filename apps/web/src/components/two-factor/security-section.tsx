@@ -5,6 +5,7 @@ import { apiFetch } from "@/lib/api";
 import { TwoFactorSetup } from "./two-factor-setup";
 import { RecoveryCodes } from "./recovery-codes";
 import { PasskeysSection } from "./passkeys-section";
+import { PasswordInput } from "@/components/password-input";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -203,9 +204,8 @@ export function SecuritySection({ onChange }: SecuritySectionProps): React.React
                 <label htmlFor="sec-password" className="text-sm font-medium">
                   Your password (leave empty if you sign in by email link)
                 </label>
-                <input
+                <PasswordInput
                   id="sec-password"
-                  type="password"
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

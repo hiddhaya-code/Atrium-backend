@@ -4,8 +4,9 @@ import { InjectPinoLogger, PinoLogger } from "nestjs-pino";
 import { Resend } from "resend";
 import * as nodemailer from "nodemailer";
 import { SettingsService } from "../settings/settings.service";
-import { smtpTransportOptions } from "./smtp-security";
+import { smtpTransportOptions, resolveSmtpSecurity } from "./smtp-security";
 import type { SmtpConfig } from "./smtp-security";
+import { SMTP_SECURITY } from "@atrium/shared";
 
 const MAX_CONCURRENT_SENDS = 2;
 
@@ -144,6 +145,43 @@ export class MailService {
           { error: err instanceof Error ? err.message : String(err) },
           "Failed to send via DB email config, falling back to env vars",
         );
+      }
+    }
+
+    const smtpHost = this.config.get("SMTP_HOST");
+    if (smtpHost) {
+      try {
+        const smtpPort = parseInt(this.config.get("SMTP_PORT", "587"), 10);
+        const smtpUser = this.config.get("SMTP_USER");
+        const smtpPass = this.config.get("SMTP_PASS");
+        const smtpSecurity = this.config.get("SMTP_SECURE") === "true"
+          ? SMTP_SECURITY.TLS
+          : this.config.get("SMTP_SECURE") === "false"
+          ? SMTP_SECURITY.NONE
+          : resolveSmtpSecurity(null, null, smtpPort);
+        const transporter = nodemailer.createTransport(
+          smtpTransportOptions({
+            host: smtpHost,
+            port: smtpPort,
+            user: smtpUser,
+            pass: smtpPass,
+            security: smtpSecurity,
+          }),
+        );
+        await transporter.sendMail({
+          from: this.from,
+          to,
+          subject,
+          html,
+        });
+        this.logger.info({ to, subject }, "Email sent via env-var SMTP");
+        return { sent: true, viaOrgConfig: false };
+      } catch (smtpErr) {
+        this.logger.error(
+          { error: smtpErr instanceof Error ? smtpErr.message : String(smtpErr), to, subject },
+          "Email not sent: env-var SMTP failed",
+        );
+        return { sent: false, viaOrgConfig: false };
       }
     }
 

@@ -10,6 +10,7 @@ import { oauthResumeUrl } from "@/lib/oauth-resume";
 import { postAuth } from "@/lib/auth-fetch";
 import { signInWithPasskey, startPasskeyAutofill } from "@/lib/passkeys";
 import { LAST_EMAIL_KEY, magicLinkErrorMessage, safeNextPath } from "@/lib/magic-link";
+import { PasswordInput } from "@/components/password-input";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -287,9 +288,8 @@ export function LoginForm({ orgName, logoSrc, hideLogo, onCustomDomain }: LoginF
                 Forgot password?
               </Link>
             </div>
-            <input
+            <PasswordInput
               id="password"
-              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required

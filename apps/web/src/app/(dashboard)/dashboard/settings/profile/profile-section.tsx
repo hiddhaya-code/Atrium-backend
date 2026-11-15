@@ -7,6 +7,7 @@ import { useSession } from "@/lib/session-context";
 import { EmailPreferencesSection } from "./email-preferences-section";
 import { useToast } from "@/components/toast";
 import { useConfirm } from "@/components/confirm-modal";
+import { PasswordInput } from "@/components/password-input";
 import type { DeletionInfo } from "@atrium/shared";
 
 export function ProfileSection(): React.ReactElement {
@@ -139,8 +140,7 @@ export function ProfileSection(): React.ReactElement {
         <form onSubmit={handleChangePassword} className="space-y-3">
           <div>
             <label className="text-sm text-[var(--muted-foreground)]">Current Password</label>
-            <input
-              type="password"
+            <PasswordInput
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               required
@@ -149,8 +149,7 @@ export function ProfileSection(): React.ReactElement {
           </div>
           <div>
             <label className="text-sm text-[var(--muted-foreground)]">New Password</label>
-            <input
-              type="password"
+            <PasswordInput
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               required
@@ -160,8 +159,7 @@ export function ProfileSection(): React.ReactElement {
           </div>
           <div>
             <label className="text-sm text-[var(--muted-foreground)]">Confirm New Password</label>
-            <input
-              type="password"
+            <PasswordInput
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required

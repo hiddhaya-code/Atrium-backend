@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/api";
 import { useSession } from "@/lib/session-context";
 import { useToast } from "@/components/toast";
 import { SecuritySection } from "@/components/two-factor/security-section";
+import { PasswordInput } from "@/components/password-input";
 
 /** Stored on the client's contact in the workspace; null when not set. */
 interface ClientProfile {
@@ -193,9 +194,8 @@ export default function PortalSettingsPage() {
               <label htmlFor="current-password" className="text-sm text-[var(--muted-foreground)]">
                 Current Password
               </label>
-              <input
+              <PasswordInput
                 id="current-password"
-                type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 required
@@ -207,9 +207,8 @@ export default function PortalSettingsPage() {
             <label htmlFor="new-password" className="text-sm text-[var(--muted-foreground)]">
               New Password
             </label>
-            <input
+            <PasswordInput
               id="new-password"
-              type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               required
@@ -221,9 +220,8 @@ export default function PortalSettingsPage() {
             <label htmlFor="confirm-password" className="text-sm text-[var(--muted-foreground)]">
               Confirm New Password
             </label>
-            <input
+            <PasswordInput
               id="confirm-password"
-              type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required

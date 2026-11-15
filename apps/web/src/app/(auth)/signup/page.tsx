@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { track } from "@/lib/track";
 import { useAppConfig } from "@/lib/app-config";
+import { PasswordInput } from "@/components/password-input";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -233,9 +234,8 @@ export default function SignupPage() {
             <label htmlFor="password" className="text-sm font-medium">
               Password
             </label>
-            <input
+            <PasswordInput
               id="password"
-              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { postAuth } from "@/lib/auth-fetch";
 import { RecoveryCodes } from "./recovery-codes";
+import { PasswordInput } from "@/components/password-input";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -90,9 +91,8 @@ export function TwoFactorSetup({ onDone }: TwoFactorSetupProps): React.ReactElem
         {needsPassword && (
           <div className="space-y-1">
             <label htmlFor="tf-password" className="text-sm font-medium">Confirm your password</label>
-            <input
+            <PasswordInput
               id="tf-password"
-              type="password"
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

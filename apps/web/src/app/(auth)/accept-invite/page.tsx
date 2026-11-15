@@ -7,6 +7,7 @@ import { setActiveOrgAndRedirect } from "@/lib/api";
 import { track } from "@/lib/track";
 import { postAuth } from "@/lib/auth-fetch";
 import { magicLinkErrorMessage } from "@/lib/magic-link";
+import { PasswordInput } from "@/components/password-input";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -364,9 +365,8 @@ function PasswordInvite({ invitationId, invitedEmail }: { invitationId: string; 
             <label htmlFor="password" className="text-sm font-medium">
               Password
             </label>
-            <input
+            <PasswordInput
               id="password"
-              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
